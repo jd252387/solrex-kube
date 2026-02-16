@@ -9,24 +9,25 @@ import java.util.Optional;
 public record ReindexFilters(
     @NotBlank String query,
     @NotNull List<@NotBlank String> fqs,
-    @NotNull Optional<List<@NotBlank String>> sourceShards
+    @NotNull List<@NotBlank String> sourceShards
 ) {
     public static final String DEFAULT_QUERY = "*:*";
 
-    public ReindexFilters(String query, List<String> fqs, Optional<List<String>> sourceShards) {
+    public ReindexFilters(String query, List<String> fqs, List<String> sourceShards) {
         this.query = normalizeQuery(query);
         this.fqs = normalizeFilters(fqs);
-        this.sourceShards = sourceShards == null ? Optional.empty() : sourceShards.map(ReindexFilters::normalizeShards);
+        this.sourceShards = normalizeShards(sourceShards);
     }
 
     public static ReindexFilters defaults() {
-        return new ReindexFilters(DEFAULT_QUERY, List.of(), Optional.empty());
+        return new ReindexFilters(DEFAULT_QUERY, List.of(), List.of());
     }
 
     public Optional<String> sourceShardsCsv() {
-        return sourceShards
-            .filter(list -> !list.isEmpty())
-            .map(list -> String.join(",", list));
+        if (sourceShards.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(String.join(",", sourceShards));
     }
 
     private static String normalizeQuery(String query) {

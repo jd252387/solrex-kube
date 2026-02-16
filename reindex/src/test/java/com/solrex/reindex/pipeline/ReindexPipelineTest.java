@@ -13,7 +13,6 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
@@ -65,7 +64,7 @@ class ReindexPipelineTest {
         return new ReindexRequest(
             new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
             new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
-            new ReindexFilters("*:*", List.of(), Optional.empty()),
+            new ReindexFilters("*:*", List.of(), List.of()),
             FieldSelection.fields(List.of("id", "title")),
             new ReindexTuning(
                 200,

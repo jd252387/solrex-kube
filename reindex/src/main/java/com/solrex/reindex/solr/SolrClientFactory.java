@@ -11,8 +11,9 @@ public final class SolrClientFactory {
             .withIdleTimeout(config.requestTimeout().toMillis(), TimeUnit.MILLISECONDS)
             .withRequestTimeout(config.requestTimeout().toMillis(), TimeUnit.MILLISECONDS);
 
-        config.basicAuthUser().ifPresent(user ->
-            builder.withBasicAuthCredentials(user, config.basicAuthPassword().orElseThrow()));
+        if (config.basicAuthUser() != null && config.basicAuthPassword() != null) {
+            builder.withBasicAuthCredentials(config.basicAuthUser(), config.basicAuthPassword());
+        }
 
         return builder.build();
     }

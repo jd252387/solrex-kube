@@ -6,7 +6,6 @@ import com.solrex.reindex.api.DefaultReindexService;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class ModelValidationTest {
@@ -43,8 +42,8 @@ class ModelValidationTest {
         var sourceConfig = new ClusterConfig(
             "http://source-solr:8983/solr",
             Duration.ofSeconds(5),
-            Optional.of("user"),
-            Optional.empty()
+            "user",
+            null
         );
         var request = new ReindexRequest(
             new CollectionRef(sourceConfig, "source_collection"),

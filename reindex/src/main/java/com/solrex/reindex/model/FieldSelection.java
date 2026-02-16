@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 public record FieldSelection(boolean allFields, @NotNull List<@NotBlank String> fields) {
@@ -23,13 +22,15 @@ public record FieldSelection(boolean allFields, @NotNull List<@NotBlank String> 
         return new FieldSelection(false, fields);
     }
 
-    public Set<String> effectiveFields(Optional<String> requiredField) {
+    public Set<String> effectiveFields(String requiredField) {
         if (allFields) {
             return Set.of("*");
         }
 
         var values = new LinkedHashSet<>(fields);
-        requiredField.ifPresent(values::add);
+        if (requiredField != null && !requiredField.isBlank()) {
+            values.add(requiredField);
+        }
         return values;
     }
 

@@ -10,7 +10,6 @@ import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.ReindexTuning;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class SchemaAwareExportEligibilityDeciderTest {
@@ -57,7 +56,7 @@ class SchemaAwareExportEligibilityDeciderTest {
         return new ReindexRequest(
             source(),
             target(),
-            new ReindexFilters("*:*", List.of(), Optional.empty()),
+            new ReindexFilters("*:*", List.of(), List.of()),
             FieldSelection.fields(List.of(fields)),
             ReindexTuning.defaults()
         );
