@@ -23,13 +23,6 @@ public record ReindexFilters(
         return new ReindexFilters(DEFAULT_QUERY, List.of(), List.of());
     }
 
-    public Optional<String> sourceShardsCsv() {
-        if (sourceShards.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(String.join(",", sourceShards));
-    }
-
     private static String normalizeQuery(String query) {
         if (query == null || query.isBlank()) {
             return DEFAULT_QUERY;

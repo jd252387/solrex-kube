@@ -88,6 +88,6 @@ public final class ReindexPipeline {
             retries.sum(),
             elapsed
         );
-        return new ReindexResult(stats, exportModeUsed, warnings);
+        return new ReindexResult(stats, exportModeUsed, warnings == null ? List.of() : List.copyOf(warnings));
     }
 }
