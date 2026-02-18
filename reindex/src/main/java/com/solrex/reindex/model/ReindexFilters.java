@@ -2,9 +2,9 @@ package com.solrex.reindex.model;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 public record ReindexFilters(
     @NotBlank String query,
