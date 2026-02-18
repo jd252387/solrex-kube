@@ -1,0 +1,18 @@
+{{- if .Values.configMap.create }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "reindex-job.configMapName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "reindex-job.labels" . | nindent 4 }}
+data:
+  reindex.job.timeout: {{ .Values.reindex.config.timeout | quote }}
+  {{- with .Values.reindex.extraConfig }}
+  {{- range $key, $value := . }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{ .Values.configMap.requestKey }}: |
+{{ toYaml .Values.reindex.request | indent 4 }}
+{{- end }}

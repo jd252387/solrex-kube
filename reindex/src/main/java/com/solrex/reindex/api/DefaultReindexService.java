@@ -2,54 +2,45 @@ package com.solrex.reindex.api;
 
 import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.ReindexResult;
-import com.solrex.reindex.pipeline.BackpressureBatcher;
 import com.solrex.reindex.pipeline.ReindexPipeline;
-import com.solrex.reindex.solr.SchemaAwareExportEligibilityDecider;
 import com.solrex.reindex.solr.SolrClientFactory;
-import com.solrex.reindex.solr.SolrSchemaMetadataProvider;
 import com.solrex.reindex.solr.SolrSourceDocumentReader;
 import com.solrex.reindex.solr.SolrTargetDocumentWriter;
 import com.solrex.reindex.validation.ValidationSupport;
 import io.smallrye.mutiny.Uni;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.Executor;
-import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@Singleton
+@RequiredArgsConstructor(onConstructor_ = @Inject)
 public final class DefaultReindexService {
     private static final Executor CLOSE_EXECUTOR = command -> Thread.ofPlatform().daemon().start(command);
 
     @NonNull
     private final SolrClientFactory solrClientFactory;
-    @NonNull
-    private final BackpressureBatcher backpressureBatcher;
 
     public DefaultReindexService() {
-        this(new SolrClientFactory(), new BackpressureBatcher());
+        this(new SolrClientFactory());
     }
 
-    public Uni<ReindexResult> reindex(@NonNull ReindexRequest request) {
+    public Uni<ReindexResult> reindex(ReindexRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
         ValidationSupport.validate(request);
 
         var sourceClient = solrClientFactory.create(request.source().cluster());
         var targetClient = solrClientFactory.create(request.target().cluster());
-
-        var sourceReader = new SolrSourceDocumentReader(
-            sourceClient,
-            new SolrSchemaMetadataProvider(sourceClient),
-            new SchemaAwareExportEligibilityDecider()
-        );
-
+        var sourceReader = new SolrSourceDocumentReader(sourceClient);
         var targetWriter = new SolrTargetDocumentWriter(targetClient);
-        var pipeline = new ReindexPipeline(sourceReader::streamDocuments, targetWriter::writeBatch, backpressureBatcher);
+        var pipeline = new ReindexPipeline(sourceReader::streamDocuments, targetWriter::writeBatch);
 
         return pipeline.execute(request)
             .eventually(() -> Uni.createFrom().voidItem()
-                // requestAsync completion callbacks run on Solr client's executor.
-                // Closing that client on the same thread can block executor shutdown.
                 .runSubscriptionOn(CLOSE_EXECUTOR)
                 .invoke(() -> {
                     closeQuietly(sourceClient);

@@ -3,14 +3,11 @@ package com.solrex.reindex.solr;
 import com.solrex.reindex.model.CollectionRef;
 import com.solrex.reindex.model.RetryPolicy;
 import com.solrex.reindex.util.ReindexErrorClassifier;
-import com.solrex.reindex.util.RetryExecutor;
 import io.smallrye.mutiny.Uni;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -24,32 +21,23 @@ public final class SolrShardLeaderDiscovery {
     @NonNull
     private final Http2SolrClient sourceClient;
 
-    public Uni<List<ShardLeaderReplica>> discoverLeaders(
-        CollectionRef source,
-        List<String> sourceShards,
-        RetryPolicy retryPolicy
-    ) {
-        return RetryExecutor.execute(
-            () -> requestClusterStatus(source.collection())
-                .onItem().transform(response -> extractShardLeaders(response, source.collection(), sourceShards)),
-            retryPolicy,
-            ReindexErrorClassifier::isRetryable
-        );
+    public Uni<List<ShardLeaderReplica>> discoverLeaders(CollectionRef source, RetryPolicy retryPolicy) {
+        return requestClusterStatus(source.collection())
+            .onItem().transform(response -> extractShardLeaders(response, source.collection()))
+            .onFailure(ReindexErrorClassifier::isRetryable)
+            .retry()
+            .withBackOff(retryPolicy.initialBackoff(), retryPolicy.maxBackoff())
+            .atMost(retryPolicy.maxRetries());
     }
 
-    static List<ShardLeaderReplica> extractShardLeaders(
-        NamedList<Object> response,
-        String collection,
-        List<String> sourceShards
-    ) {
+    static List<ShardLeaderReplica> extractShardLeaders(NamedList<Object> response, String collection) {
         var collections = requiredObject(requiredObject(response, "cluster"), "collections");
         var collectionStatus = requiredObject(collections, collection);
         var shards = requiredObject(collectionStatus, "shards");
 
         var discoveredLeaders = new ArrayList<ShardLeaderReplica>();
         for (var shard : entries(shards)) {
-            var leader = leaderReplicaForShard(shard.key(), shard.value());
-            discoveredLeaders.add(leader);
+            discoveredLeaders.add(leaderReplicaForShard(shard.key(), shard.value()));
         }
 
         discoveredLeaders.sort(Comparator.comparing(ShardLeaderReplica::logicalShard));
@@ -57,32 +45,7 @@ public final class SolrShardLeaderDiscovery {
             throw new IllegalStateException("No active shard leaders were discovered for collection '" + collection + "'");
         }
 
-        var requested = sourceShards == null
-            ? new LinkedHashSet<String>()
-            : sourceShards.stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(shard -> !shard.isEmpty())
-                .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
-        if (requested.isEmpty()) {
-            return List.copyOf(discoveredLeaders);
-        }
-        var discoveredNames = discoveredLeaders.stream()
-            .map(ShardLeaderReplica::logicalShard)
-            .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
-
-        var unknownShards = requested.stream()
-            .filter(shard -> !discoveredNames.contains(shard))
-            .toList();
-        if (!unknownShards.isEmpty()) {
-            throw new IllegalArgumentException(
-                "Requested source shards were not found in source collection '" + collection + "': " + unknownShards
-            );
-        }
-
-        return discoveredLeaders.stream()
-            .filter(leader -> requested.contains(leader.logicalShard()))
-            .toList();
+        return List.copyOf(discoveredLeaders);
     }
 
     private Uni<NamedList<Object>> requestClusterStatus(String collection) {

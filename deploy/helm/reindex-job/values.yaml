@@ -1,0 +1,87 @@
+image:
+  repository: solrex/reindex
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  create: true
+
+configMap:
+  create: true
+  name: ""
+  requestKey: request.yaml
+
+kubernetesConfig:
+  enabled: true
+  failOnMissingConfig: true
+  namespaceFromPod: true
+  namespace: ""
+  configMaps: []
+
+reindex:
+  requestFile: /etc/reindex/request.yaml
+  config:
+    timeout: PT20M
+  extraConfig: {}
+  request:
+    source:
+      cluster:
+        baseUrl: http://solr-a:8983/solr
+        requestTimeout: PT30S
+      collection: source_collection
+    target:
+      cluster:
+        baseUrl: http://solr-b:8983/solr
+        requestTimeout: PT30S
+      collection: target_collection
+    filters:
+      query: "*:*"
+      fqs: []
+    fields:
+      - id
+      - title
+      - category
+    tuning:
+      readPageSize: 500
+      writeBatchSize: 200
+      writeConcurrency: 4
+      retryPolicy:
+        maxRetries: 3
+        initialBackoff: PT0.25S
+        maxBackoff: PT5S
+        jitterFactor: 0.2
+
+job:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  activeDeadlineSeconds: null
+  labels: {}
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+extraEnv: []

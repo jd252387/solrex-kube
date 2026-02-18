@@ -1,0 +1,10 @@
+FROM eclipse-temurin:21-jre
+
+WORKDIR /work/
+
+COPY build/quarkus-app/lib/ ./lib/
+COPY build/quarkus-app/*.jar ./
+COPY build/quarkus-app/app/ ./app/
+COPY build/quarkus-app/quarkus/ ./quarkus/
+
+ENTRYPOINT ["java", "-jar", "quarkus-run.jar"]

@@ -15,7 +15,7 @@ class ModelValidationTest {
             new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
             new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "  "),
             ReindexFilters.defaults(),
-            FieldSelection.fields(List.of("id")),
+            List.of("id"),
             ReindexTuning.defaults()
         );
 
@@ -29,8 +29,8 @@ class ModelValidationTest {
             new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
             new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
             ReindexFilters.defaults(),
-            FieldSelection.fields(List.of("id")),
-            new ReindexTuning(0, 100, 1, 1, 4, Duration.ofSeconds(5), RetryPolicy.defaults())
+            List.of("id"),
+            new ReindexTuning(0, 100, 1, RetryPolicy.defaults())
         );
 
         assertThatThrownBy(() -> new DefaultReindexService().reindex(request))
@@ -49,7 +49,7 @@ class ModelValidationTest {
             new CollectionRef(sourceConfig, "source_collection"),
             new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
             ReindexFilters.defaults(),
-            FieldSelection.fields(List.of("id")),
+            List.of("id"),
             ReindexTuning.defaults()
         );
 

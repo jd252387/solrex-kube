@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reindex-api-job-writer
+  namespace: solrex
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: reindex-api-job-writer
+  namespace: solrex
+subjects:
+  - kind: ServiceAccount
+    name: reindex-api
+    namespace: solrex
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: reindex-api-job-writer

@@ -1,9 +1,11 @@
 package com.solrex.reindex.solr;
 
 import com.solrex.reindex.model.ClusterConfig;
+import jakarta.inject.Singleton;
 import java.util.concurrent.TimeUnit;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 
+@Singleton
 public final class SolrClientFactory {
     public Http2SolrClient create(ClusterConfig config) {
         var builder = new Http2SolrClient.Builder(config.baseUrl())

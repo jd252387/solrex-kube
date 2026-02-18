@@ -8,6 +8,8 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/reindex" />
+            <option value="$PROJECT_DIR$/reindex-api" />
+            <option value="$PROJECT_DIR$/reindex-common" />
           </set>
         </option>
       </GradleProjectSettings>

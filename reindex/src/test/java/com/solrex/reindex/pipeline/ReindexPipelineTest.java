@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.solrex.reindex.model.ClusterConfig;
 import com.solrex.reindex.model.CollectionRef;
-import com.solrex.reindex.model.FieldSelection;
 import com.solrex.reindex.model.ReindexFilters;
 import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.ReindexTuning;
-import com.solrex.reindex.solr.SourceDocumentStream;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
@@ -30,8 +28,8 @@ class ReindexPipelineTest {
         var inFlight = new AtomicInteger();
         var indexedBatchSizes = new CopyOnWriteArrayList<Integer>();
 
-        Function<ReindexRequest, Uni<SourceDocumentStream>> reader = ignored -> Uni.createFrom().item(
-            new SourceDocumentStream(Multi.createFrom().iterable(docs), false, List.of())
+        Function<ReindexRequest, Uni<Multi<SolrInputDocument>>> reader = ignored -> Uni.createFrom().item(
+            Multi.createFrom().iterable(docs)
         );
 
         BiFunction<ReindexRequest, List<SolrInputDocument>, Uni<Void>> writer = (ignored, batch) -> Uni.createFrom().item(() -> {
@@ -49,7 +47,7 @@ class ReindexPipelineTest {
             return null;
         }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool()).replaceWithVoid();
 
-        var result = new ReindexPipeline(reader, writer, new BackpressureBatcher())
+        var result = new ReindexPipeline(reader, writer)
             .execute(request)
             .await().indefinitely();
 
@@ -64,15 +62,12 @@ class ReindexPipelineTest {
         return new ReindexRequest(
             new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
             new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
-            new ReindexFilters("*:*", List.of(), List.of()),
-            FieldSelection.fields(List.of("id", "title")),
+            new ReindexFilters("*:*", List.of()),
+            List.of("id", "title"),
             new ReindexTuning(
                 200,
                 4,
-                1,
                 4,
-                16,
-                ReindexTuning.defaults().requestTimeout(),
                 ReindexTuning.defaults().retryPolicy()
             )
         );

@@ -1,0 +1,24 @@
+quarkus:
+  application:
+    name: reindex-api
+  kubernetes:
+    namespace: ${KUBERNETES_NAMESPACE:solrex}
+    part-of: solrex
+    name: reindex-api
+    image-pull-policy: IfNotPresent
+    service-account: reindex-api
+  kubernetes-client:
+    trust-certs: true
+
+reindex:
+  api:
+    k8s:
+      namespace: ${KUBERNETES_NAMESPACE:solrex}
+    job:
+      image: ${REINDEX_JOB_IMAGE:solrex/reindex:latest}
+      service-account: ${REINDEX_JOB_SERVICE_ACCOUNT:reindex-job}
+      backoff-limit: ${REINDEX_JOB_BACKOFF_LIMIT:1}
+      ttl-seconds-after-finished: ${REINDEX_JOB_TTL_SECONDS_AFTER_FINISHED:3600}
+      request-file: ${REINDEX_JOB_REQUEST_FILE:/etc/reindex/request.yaml}
+      kubernetes-config-enabled: true
+      kubernetes-config-fail-on-missing-config: true

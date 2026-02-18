@@ -1,0 +1,15 @@
+quarkus:
+  application:
+    name: reindex
+  package:
+    main-class: com.solrex.ReindexJobMain
+  kubernetes-config:
+    enabled: ${QUARKUS_KUBERNETES_CONFIG_ENABLED:false}
+    fail-on-missing-config: ${QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG:false}
+    namespace: ${REINDEX_K8S_NAMESPACE:solrex}
+    config-maps: ${REINDEX_CONFIG_MAPS:reindex-job-config}
+
+reindex:
+  job:
+    request-file: ${REINDEX_REQUEST_FILE:/etc/reindex/request.yaml}
+    timeout: ${REINDEX_JOB_TIMEOUT:PT15M}
