@@ -13,12 +13,15 @@ import com.solrex.reindex.validation.ValidationSupport;
 import io.smallrye.mutiny.Uni;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.Executor;
 import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public final class DefaultReindexService {
+    private static final Executor CLOSE_EXECUTOR = command -> Thread.ofPlatform().daemon().start(command);
+
     @NonNull
     private final SolrClientFactory solrClientFactory;
     @NonNull
@@ -44,10 +47,14 @@ public final class DefaultReindexService {
         var pipeline = new ReindexPipeline(sourceReader::streamDocuments, targetWriter::writeBatch, backpressureBatcher);
 
         return pipeline.execute(request)
-            .eventually(() -> {
-                closeQuietly(sourceClient);
-                closeQuietly(targetClient);
-            });
+            .eventually(() -> Uni.createFrom().voidItem()
+                // requestAsync completion callbacks run on Solr client's executor.
+                // Closing that client on the same thread can block executor shutdown.
+                .runSubscriptionOn(CLOSE_EXECUTOR)
+                .invoke(() -> {
+                    closeQuietly(sourceClient);
+                    closeQuietly(targetClient);
+                }));
     }
 
     private void closeQuietly(Closeable closeable) {

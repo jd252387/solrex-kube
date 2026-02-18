@@ -25,13 +25,13 @@ dependencies {
     implementation("org.hibernate.validator:hibernate-validator:8.0.2.Final")
     implementation("org.glassfish:jakarta.el:4.0.2")
     implementation("org.slf4j:slf4j-api:2.0.16")
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.16")
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.26.3")
     testCompileOnly("org.projectlombok:lombok:1.18.36")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.36")
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.16")
 }
 
 tasks.test {

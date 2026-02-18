@@ -164,7 +164,6 @@ public final class SolrSourceDocumentReader {
         params.set(CommonParams.ROWS, request.tuning().readPageSize());
 
         var queryRequest = new QueryRequest(params, SolrRequest.METHOD.GET);
-        queryRequest.setBasePath(shard.baseUrl());
 
         return requestAsync(queryRequest, shard.coreName())
             .onItem().transform(response -> {
@@ -230,7 +229,6 @@ public final class SolrSourceDocumentReader {
 
         var queryRequest = new QueryRequest(params, SolrRequest.METHOD.GET);
         queryRequest.setResponseParser(new InputStreamResponseParser("json"));
-        queryRequest.setBasePath(shard.baseUrl());
 
         return requestAsync(queryRequest, shard.coreName())
             .onItem().transform(response -> {

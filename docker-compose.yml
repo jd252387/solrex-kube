@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  zk-a:
+    image: zookeeper:3.9
+    container_name: zk-a
+    hostname: zk-a
+    environment:
+      ZOO_4LW_COMMANDS_WHITELIST: ruok,mntr,conf
+    ports:
+      - "2181:2181"
+
+  solr-a:
+    image: solr:9.10
+    container_name: solr-a
+    hostname: solr-a
+    depends_on:
+      - zk-a
+    command: ["solr-fg", "-c", "-z", "zk-a:2181"]
+    environment:
+      SOLR_HEAP: 1g
+    ports:
+      - "8983:8983"
+
+  zk-b:
+    image: zookeeper:3.9
+    container_name: zk-b
+    hostname: zk-b
+    environment:
+      ZOO_4LW_COMMANDS_WHITELIST: ruok,mntr,conf
+    ports:
+      - "2182:2181"
+
+  solr-b:
+    image: solr:9.10
+    container_name: solr-b
+    hostname: solr-b
+    depends_on:
+      - zk-b
+    command: ["solr-fg", "-c", "-z", "zk-b:2181"]
+    environment:
+      SOLR_HEAP: 1g
+    ports:
+      - "8984:8983"

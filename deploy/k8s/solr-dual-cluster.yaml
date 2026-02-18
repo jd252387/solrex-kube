@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: solrex
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zk-a
+  namespace: solrex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zk-a
+  template:
+    metadata:
+      labels:
+        app: zk-a
+    spec:
+      containers:
+        - name: zookeeper
+          image: zookeeper:3.9
+          ports:
+            - containerPort: 2181
+          env:
+            - name: ZOO_4LW_COMMANDS_WHITELIST
+              value: ruok,mntr,conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-a
+  namespace: solrex
+spec:
+  selector:
+    app: zk-a
+  ports:
+    - port: 2181
+      targetPort: 2181
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solr-a
+  namespace: solrex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: solr-a
+  template:
+    metadata:
+      labels:
+        app: solr-a
+    spec:
+      containers:
+        - name: solr
+          image: solr:9.10
+          args: ["solr-fg", "-c", "-z", "zk-a:2181"]
+          env:
+            - name: SOLR_HEAP
+              value: 1g
+          ports:
+            - containerPort: 8983
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solr-a
+  namespace: solrex
+spec:
+  type: NodePort
+  selector:
+    app: solr-a
+  ports:
+    - name: http
+      port: 8983
+      targetPort: 8983
+      nodePort: 30983
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zk-b
+  namespace: solrex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zk-b
+  template:
+    metadata:
+      labels:
+        app: zk-b
+    spec:
+      containers:
+        - name: zookeeper
+          image: zookeeper:3.9
+          ports:
+            - containerPort: 2181
+          env:
+            - name: ZOO_4LW_COMMANDS_WHITELIST
+              value: ruok,mntr,conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-b
+  namespace: solrex
+spec:
+  selector:
+    app: zk-b
+  ports:
+    - port: 2181
+      targetPort: 2181
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solr-b
+  namespace: solrex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: solr-b
+  template:
+    metadata:
+      labels:
+        app: solr-b
+    spec:
+      containers:
+        - name: solr
+          image: solr:9.10
+          args: ["solr-fg", "-c", "-z", "zk-b:2181"]
+          env:
+            - name: SOLR_HEAP
+              value: 1g
+          ports:
+            - containerPort: 8983
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solr-b
+  namespace: solrex
+spec:
+  type: NodePort
+  selector:
+    app: solr-b
+  ports:
+    - name: http
+      port: 8983
+      targetPort: 8983
+      nodePort: 30984
