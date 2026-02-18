@@ -2,6 +2,12 @@ package com.solrex.reindex.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.solrex.reindex.test.ReindexRequestFixtures.fullRequestYaml;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlUsingDefaults;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlWithUnsupportedProperty;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlWithoutFields;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlWithoutSource;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlWithoutTarget;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,37 +22,7 @@ class ReindexRequestLoaderTest {
 
     @Test
     void shouldParseFullRequestYaml() throws Exception {
-        var requestFile = tempDir.resolve("request.yaml");
-        Files.writeString(requestFile, """
-            source:
-              cluster:
-                baseUrl: http://source-solr:8983/solr/
-                requestTimeout: PT20S
-                basicAuthUser: source-user
-                basicAuthPassword: source-password
-              collection: source_collection
-            target:
-              cluster:
-                baseUrl: http://target-solr:8983/solr
-                requestTimeout: PT25S
-              collection: target_collection
-            filters:
-              query: '*:*'
-              fqs:
-                - type:book
-            fields:
-              - id
-              - title
-            tuning:
-              readPageSize: 100
-              writeBatchSize: 80
-              writeConcurrency: 3
-              retryPolicy:
-                maxRetries: 4
-                initialBackoff: PT0.2S
-                maxBackoff: PT3S
-                jitterFactor: 0.1
-            """);
+        var requestFile = writeRequestFile("request.yaml", fullRequestYaml());
 
         var request = loader.load(requestFile);
 
@@ -69,19 +45,7 @@ class ReindexRequestLoaderTest {
 
     @Test
     void shouldUseRequestDefaultsWhenOptionalSectionsAreMissing() throws Exception {
-        var requestFile = tempDir.resolve("request-defaults.yaml");
-        Files.writeString(requestFile, """
-            source:
-              cluster:
-                baseUrl: http://source-solr:8983/solr
-              collection: source_collection
-            target:
-              cluster:
-                baseUrl: http://target-solr:8983/solr
-              collection: target_collection
-            fields:
-              - id
-            """);
+        var requestFile = writeRequestFile("request-defaults.yaml", requestYamlUsingDefaults());
 
         var request = loader.load(requestFile);
 
@@ -94,20 +58,7 @@ class ReindexRequestLoaderTest {
 
     @Test
     void shouldRejectUnknownPropertiesInRequestYaml() throws Exception {
-        var requestFile = tempDir.resolve("request-invalid.yaml");
-        Files.writeString(requestFile, """
-            source:
-              cluster:
-                baseUrl: http://source-solr:8983/solr
-              collection: source_collection
-            target:
-              cluster:
-                baseUrl: http://target-solr:8983/solr
-              collection: target_collection
-            fields:
-              - id
-            unsupported: true
-            """);
+        var requestFile = writeRequestFile("request-invalid.yaml", requestYamlWithUnsupportedProperty());
 
         assertThatThrownBy(() -> loader.load(requestFile))
             .isInstanceOf(IllegalStateException.class)
@@ -121,5 +72,38 @@ class ReindexRequestLoaderTest {
         assertThatThrownBy(() -> loader.load(missingFile))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("does not exist");
+    }
+
+    @Test
+    void shouldFailWhenSourceIsMissing() throws Exception {
+        var requestFile = writeRequestFile("missing-source.yaml", requestYamlWithoutSource());
+
+        assertThatThrownBy(() -> loader.load(requestFile))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("missing required field 'source'");
+    }
+
+    @Test
+    void shouldFailWhenTargetIsMissing() throws Exception {
+        var requestFile = writeRequestFile("missing-target.yaml", requestYamlWithoutTarget());
+
+        assertThatThrownBy(() -> loader.load(requestFile))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("missing required field 'target'");
+    }
+
+    @Test
+    void shouldFailWhenFieldsAreMissing() throws Exception {
+        var requestFile = writeRequestFile("missing-fields.yaml", requestYamlWithoutFields());
+
+        assertThatThrownBy(() -> loader.load(requestFile))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("missing required field 'fields'");
+    }
+
+    private Path writeRequestFile(String fileName, String requestYaml) throws Exception {
+        var requestFile = tempDir.resolve(fileName);
+        Files.writeString(requestFile, requestYaml);
+        return requestFile;
     }
 }

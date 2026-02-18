@@ -71,6 +71,33 @@ class ReindexJobServiceTest {
             .hasMessageContaining("Generated job name already exists");
     }
 
+    @Test
+    void createAlwaysIncludesRequiredEnvironmentVariables() {
+        var config = config(Optional.of("solrex"));
+        var clock = Clock.fixed(Instant.parse("2026-02-18T16:25:00Z"), ZoneOffset.UTC);
+        var service = new TestableReindexJobService(config, "solrex", clock);
+
+        service.create(TestReindexRequests.valid());
+
+        var envNames = service.job.getSpec()
+            .getTemplate()
+            .getSpec()
+            .getContainers()
+            .getFirst()
+            .getEnv()
+            .stream()
+            .map(env -> env.getName())
+            .toList();
+
+        assertThat(envNames).contains(
+            "QUARKUS_KUBERNETES_CONFIG_ENABLED",
+            "QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG",
+            "REINDEX_K8S_NAMESPACE",
+            "REINDEX_CONFIG_MAPS",
+            "REINDEX_REQUEST_FILE"
+        );
+    }
+
     private static ReindexApiConfig config(Optional<String> fallbackNamespace) {
         var config = mock(ReindexApiConfig.class);
         var k8sConfig = mock(ReindexApiConfig.K8s.class);

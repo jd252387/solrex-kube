@@ -1,15 +1,16 @@
 package com.solrex.reindex.pipeline;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.solrex.reindex.model.ClusterConfig;
-import com.solrex.reindex.model.CollectionRef;
-import com.solrex.reindex.model.ReindexFilters;
 import com.solrex.reindex.model.ReindexRequest;
-import com.solrex.reindex.model.ReindexTuning;
+import com.solrex.reindex.model.RetryPolicy;
+import com.solrex.reindex.test.ReindexRequestFixtures;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
+import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,7 +23,7 @@ class ReindexPipelineTest {
     @Test
     void shouldIndexAllDocumentsAndTrackStats() {
         var docs = List.of(doc(1), doc(2), doc(3), doc(4), doc(5), doc(6), doc(7), doc(8), doc(9), doc(10));
-        var request = request();
+        var request = ReindexRequestFixtures.requestWithRetryPolicy(RetryPolicy.defaults());
 
         var maxInFlight = new AtomicInteger();
         var inFlight = new AtomicInteger();
@@ -58,19 +59,57 @@ class ReindexPipelineTest {
         assertThat(maxInFlight.get()).isGreaterThan(1);
     }
 
-    private ReindexRequest request() {
-        return new ReindexRequest(
-            new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
-            new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
-            new ReindexFilters("*:*", List.of()),
-            List.of("id", "title"),
-            new ReindexTuning(
-                200,
-                4,
-                4,
-                ReindexTuning.defaults().retryPolicy()
-            )
+    @Test
+    void shouldCountOnlyScheduledRetriesWhenBatchEventuallySucceeds() {
+        var docs = List.of(doc(1), doc(2));
+        var attempts = new AtomicInteger();
+        var request = ReindexRequestFixtures.requestWithRetryPolicy(
+            new RetryPolicy(3, Duration.ofMillis(1), Duration.ofMillis(1), 0.0)
         );
+
+        Function<ReindexRequest, Uni<Multi<SolrInputDocument>>> reader = ignored -> Uni.createFrom().item(
+            Multi.createFrom().iterable(docs)
+        );
+
+        BiFunction<ReindexRequest, List<SolrInputDocument>, Uni<Void>> writer = (ignored, batch) -> Uni.createFrom().deferred(() -> {
+            if (attempts.getAndIncrement() < 2) {
+                return Uni.createFrom().failure(new IOException("temporary failure"));
+            }
+            return Uni.createFrom().voidItem();
+        });
+
+        var result = new ReindexPipeline(reader, writer)
+            .execute(request)
+            .await().indefinitely();
+
+        assertThat(attempts.get()).isEqualTo(3);
+        assertThat(result.stats().retries()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldStopRetryingAfterConfiguredMaxRetries() {
+        var docs = List.of(doc(1), doc(2));
+        var attempts = new AtomicInteger();
+        var request = ReindexRequestFixtures.requestWithRetryPolicy(
+            new RetryPolicy(2, Duration.ofMillis(1), Duration.ofMillis(1), 0.0)
+        );
+
+        Function<ReindexRequest, Uni<Multi<SolrInputDocument>>> reader = ignored -> Uni.createFrom().item(
+            Multi.createFrom().iterable(docs)
+        );
+
+        BiFunction<ReindexRequest, List<SolrInputDocument>, Uni<Void>> writer = (ignored, batch) -> Uni.createFrom().deferred(() -> {
+            attempts.incrementAndGet();
+            return Uni.createFrom().failure(new IOException("temporary failure"));
+        });
+
+        assertThatThrownBy(() -> new ReindexPipeline(reader, writer)
+            .execute(request)
+            .await()
+            .indefinitely())
+                .satisfies(error -> assertThat(error instanceof IOException || error.getCause() instanceof IOException).isTrue());
+
+        assertThat(attempts.get()).isEqualTo(3);
     }
 
     private SolrInputDocument doc(int id) {

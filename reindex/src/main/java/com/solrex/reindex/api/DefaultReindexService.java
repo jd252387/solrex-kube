@@ -6,13 +6,17 @@ import com.solrex.reindex.pipeline.ReindexPipeline;
 import com.solrex.reindex.solr.SolrClientFactory;
 import com.solrex.reindex.solr.SolrSourceDocumentReader;
 import com.solrex.reindex.solr.SolrTargetDocumentWriter;
-import com.solrex.reindex.validation.ValidationSupport;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +28,20 @@ public final class DefaultReindexService {
 
     @NonNull
     private final SolrClientFactory solrClientFactory;
+    @NonNull
+    private final Validator validator;
 
     public DefaultReindexService() {
-        this(new SolrClientFactory());
+        this(new SolrClientFactory(), Validation.buildDefaultValidatorFactory().getValidator());
+    }
+
+    public DefaultReindexService(SolrClientFactory solrClientFactory) {
+        this(solrClientFactory, Validation.buildDefaultValidatorFactory().getValidator());
     }
 
     public Uni<ReindexResult> reindex(ReindexRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        ValidationSupport.validate(request);
+        validate(request);
 
         var sourceClient = solrClientFactory.create(request.source().cluster());
         var targetClient = solrClientFactory.create(request.target().cluster());
@@ -46,6 +56,13 @@ public final class DefaultReindexService {
                     closeQuietly(sourceClient);
                     closeQuietly(targetClient);
                 }));
+    }
+
+    private void validate(ReindexRequest request) {
+        Set<ConstraintViolation<ReindexRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
     }
 
     private void closeQuietly(Closeable closeable) {

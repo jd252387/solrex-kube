@@ -3,6 +3,7 @@ package com.solrex.reindex.solr;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.solr.common.util.NamedList;
 import org.junit.jupiter.api.Test;
@@ -55,18 +56,41 @@ class SolrShardLeaderDiscoveryTest {
             .hasMessageContaining("No ACTIVE leader replica found for shard 'shard1'");
     }
 
-    private NamedList<Object> clusterStatus(Map<String, Object> shards) {
+    @Test
+    void shouldFailWhenClusterPayloadIsMissing() {
         var response = new NamedList<Object>();
-        response.add(
-            "cluster",
-            Map.of(
-                "collections",
-                Map.of(
-                    "source_collection",
-                    Map.of("shards", shards)
-                )
-            )
-        );
+
+        assertThatThrownBy(() -> SolrShardLeaderDiscovery.extractShardLeaders(response, "source_collection"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Required object 'cluster' was missing");
+    }
+
+    @Test
+    void shouldFailWhenClusterPayloadIsNotMapLike() {
+        var response = new NamedList<Object>();
+        response.add("cluster", "not-an-object");
+
+        assertThatThrownBy(() -> SolrShardLeaderDiscovery.extractShardLeaders(response, "source_collection"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Object 'cluster' in cluster status response must be map-like");
+    }
+
+    @Test
+    void shouldFailWhenCollectionsPayloadIsNotMapLike() {
+        var response = clusterStatusObject(Map.of("collections", List.of("source_collection")));
+
+        assertThatThrownBy(() -> SolrShardLeaderDiscovery.extractShardLeaders(response, "source_collection"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Object 'cluster.collections' in cluster status response must be map-like");
+    }
+
+    private NamedList<Object> clusterStatus(Map<String, Object> shards) {
+        return clusterStatusObject(Map.of("collections", Map.of("source_collection", Map.of("shards", shards))));
+    }
+
+    private NamedList<Object> clusterStatusObject(Object cluster) {
+        var response = new NamedList<Object>();
+        response.add("cluster", cluster);
         return response;
     }
 

@@ -3,6 +3,7 @@ package com.solrex.reindex.pipeline;
 import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.ReindexResult;
 import com.solrex.reindex.model.ReindexStats;
+import com.solrex.reindex.model.RetryPolicy;
 import com.solrex.reindex.util.ReindexErrorClassifier;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -37,16 +38,7 @@ public final class ReindexPipeline {
                     .onOverflow().buffer(maxBufferedDocs)
                     .group().intoLists().of(request.tuning().writeBatchSize())
                     .onItem().transformToUni(batch ->
-                        targetDocumentWriter.apply(request, batch)
-                            .onFailure(ReindexErrorClassifier::isRetryable)
-                            .invoke(failure -> retries.increment())
-                            .onFailure(ReindexErrorClassifier::isRetryable)
-                            .retry()
-                            .withBackOff(
-                                request.tuning().retryPolicy().initialBackoff(),
-                                request.tuning().retryPolicy().maxBackoff()
-                            )
-                            .atMost(request.tuning().retryPolicy().maxRetries())
+                        writeBatchWithRetry(request, batch, retries, 0)
                             .onItem().invoke(() -> {
                                 batchesSent.increment();
                                 docsIndexed.add(batch.size());
@@ -56,6 +48,28 @@ public final class ReindexPipeline {
                     .collect().asList()
                     .replaceWith(() -> toResult(startedAt, docsRead, docsIndexed, batchesSent, retries))
             );
+    }
+
+    private Uni<Void> writeBatchWithRetry(
+        ReindexRequest request,
+        List<SolrInputDocument> batch,
+        LongAdder retries,
+        int retriesScheduled
+    ) {
+        return targetDocumentWriter.apply(request, batch)
+            .onFailure(failure -> shouldRetry(request.tuning().retryPolicy(), failure, retriesScheduled))
+            .recoverWithUni(failure -> {
+                var retryAttempt = retriesScheduled + 1;
+                retries.increment();
+                return Uni.createFrom().voidItem()
+                    .onItem().delayIt().by(request.tuning().retryPolicy().backoffForAttempt(retryAttempt))
+                    .flatMap(ignored -> writeBatchWithRetry(request, batch, retries, retryAttempt));
+            });
+    }
+
+    private boolean shouldRetry(RetryPolicy retryPolicy, Throwable failure, int retriesScheduled) {
+        return ReindexErrorClassifier.isRetryable(failure)
+            && retriesScheduled < retryPolicy.maxRetries();
     }
 
     private ReindexResult toResult(

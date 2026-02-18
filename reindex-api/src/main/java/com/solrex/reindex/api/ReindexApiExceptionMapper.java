@@ -23,13 +23,13 @@ public final class ReindexApiExceptionMapper implements ExceptionMapper<Throwabl
                 .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                 .sorted(Comparator.naturalOrder())
                 .toList();
-            return error(Response.Status.BAD_REQUEST, "VALIDATION_ERROR", "Invalid request payload.", details);
+            return error(Response.Status.BAD_REQUEST, ApiErrorCode.VALIDATION_ERROR, "Invalid request payload.", details);
         }
 
         if (exception instanceof InvalidReindexRequestException invalidRequestException) {
             return error(
                 Response.Status.BAD_REQUEST,
-                "VALIDATION_ERROR",
+                ApiErrorCode.VALIDATION_ERROR,
                 invalidRequestException.getMessage(),
                 invalidRequestException.details()
             );
@@ -38,7 +38,7 @@ public final class ReindexApiExceptionMapper implements ExceptionMapper<Throwabl
         if (exception instanceof ReindexJobConflictException conflictException) {
             return error(
                 Response.Status.CONFLICT,
-                "REINDEX_JOB_CONFLICT",
+                ApiErrorCode.REINDEX_JOB_CONFLICT,
                 conflictException.getMessage(),
                 List.of("A job with the generated name already exists.")
             );
@@ -47,7 +47,7 @@ public final class ReindexApiExceptionMapper implements ExceptionMapper<Throwabl
         if (exception instanceof ReindexJobCreationException creationException) {
             return error(
                 Response.Status.INTERNAL_SERVER_ERROR,
-                "REINDEX_JOB_CREATE_FAILED",
+                ApiErrorCode.REINDEX_JOB_CREATE_FAILED,
                 creationException.getMessage(),
                 List.of("Failed to create one or more Kubernetes resources.")
             );
@@ -55,13 +55,13 @@ public final class ReindexApiExceptionMapper implements ExceptionMapper<Throwabl
 
         return error(
             Response.Status.INTERNAL_SERVER_ERROR,
-            "INTERNAL_ERROR",
+            ApiErrorCode.INTERNAL_ERROR,
             "Unexpected server error.",
             List.of()
         );
     }
 
-    private Response error(Response.Status status, String code, String message, List<String> details) {
+    private Response error(Response.Status status, ApiErrorCode code, String message, List<String> details) {
         return Response.status(status)
             .type(MediaType.APPLICATION_JSON_TYPE)
             .entity(ApiErrorResponse.of(code, message, details))

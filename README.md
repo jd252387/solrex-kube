@@ -57,30 +57,19 @@ curl -X POST http://reindex-api/api/v1/reindex/jobs \
   -H 'Content-Type: application/json' \
   -d '{
     "source": {
-      "cluster": {"baseUrl": "http://solr-a:8983/solr", "requestTimeout": "PT30S"},
+      "cluster": {"baseUrl": "http://solr-a:8983/solr"},
       "collection": "source_collection"
     },
     "target": {
-      "cluster": {"baseUrl": "http://solr-b:8983/solr", "requestTimeout": "PT30S"},
+      "cluster": {"baseUrl": "http://solr-b:8983/solr"},
       "collection": "target_collection"
     },
-    "filters": {"query": "*:*", "fqs": []},
-    "fields": ["id", "title", "category"],
-    "tuning": {
-      "readPageSize": 500,
-      "writeBatchSize": 200,
-      "writeConcurrency": 4,
-      "retryPolicy": {
-        "maxRetries": 3,
-        "initialBackoff": "PT0.25S",
-        "maxBackoff": "PT5S",
-        "jitterFactor": 0.2
-      }
-    }
+    "fields": ["id", "title", "category"]
   }'
 ```
 
 Successful response returns `202 Accepted` with generated `jobName` and `requestConfigMapName`.
+The worker does not support shard-level request targeting fields; keep requests to the documented `ReindexRequest` schema.
 
 ## Verify Spawned Job
 

@@ -33,9 +33,22 @@ public final class ReindexRequestLoader {
             if (request == null) {
                 throw new IllegalStateException("Reindex request file produced an empty request: " + requestFile);
             }
-            return request;
+            return validateRequiredShape(request, requestFile);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to parse reindex request file: " + requestFile, e);
         }
+    }
+
+    private ReindexRequest validateRequiredShape(ReindexRequest request, Path requestFile) {
+        if (request.source() == null) {
+            throw new IllegalStateException("Reindex request file is missing required field 'source': " + requestFile);
+        }
+        if (request.target() == null) {
+            throw new IllegalStateException("Reindex request file is missing required field 'target': " + requestFile);
+        }
+        if (request.fields() == null || request.fields().isEmpty()) {
+            throw new IllegalStateException("Reindex request file is missing required field 'fields': " + requestFile);
+        }
+        return request;
     }
 }

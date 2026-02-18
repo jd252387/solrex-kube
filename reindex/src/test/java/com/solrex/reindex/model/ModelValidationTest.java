@@ -3,21 +3,15 @@ package com.solrex.reindex.model;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.solrex.reindex.api.DefaultReindexService;
+import com.solrex.reindex.test.ReindexRequestFixtures;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Duration;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ModelValidationTest {
     @Test
     void shouldRejectBlankCollectionNameAtServiceBoundary() {
-        var request = new ReindexRequest(
-            new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
-            new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "  "),
-            ReindexFilters.defaults(),
-            List.of("id"),
-            ReindexTuning.defaults()
-        );
+        var request = ReindexRequestFixtures.requestWithTargetCollection("  ");
 
         assertThatThrownBy(() -> new DefaultReindexService().reindex(request))
             .isInstanceOf(ConstraintViolationException.class);
@@ -25,13 +19,7 @@ class ModelValidationTest {
 
     @Test
     void shouldRejectNonPositiveReadPageSizeAtServiceBoundary() {
-        var request = new ReindexRequest(
-            new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
-            new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
-            ReindexFilters.defaults(),
-            List.of("id"),
-            new ReindexTuning(0, 100, 1, RetryPolicy.defaults())
-        );
+        var request = ReindexRequestFixtures.requestWithTuning(new ReindexTuning(0, 100, 1, RetryPolicy.defaults()));
 
         assertThatThrownBy(() -> new DefaultReindexService().reindex(request))
             .isInstanceOf(ConstraintViolationException.class);
@@ -45,13 +33,7 @@ class ModelValidationTest {
             "user",
             null
         );
-        var request = new ReindexRequest(
-            new CollectionRef(sourceConfig, "source_collection"),
-            new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
-            ReindexFilters.defaults(),
-            List.of("id"),
-            ReindexTuning.defaults()
-        );
+        var request = ReindexRequestFixtures.requestWithSourceCluster(sourceConfig);
 
         assertThatThrownBy(() -> new DefaultReindexService().reindex(request))
             .isInstanceOf(ConstraintViolationException.class);

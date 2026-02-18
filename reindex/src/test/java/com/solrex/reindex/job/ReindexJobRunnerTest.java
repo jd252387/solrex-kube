@@ -1,6 +1,7 @@
 package com.solrex.reindex.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlWithBlankTargetCollection;
 
 import com.solrex.reindex.api.DefaultReindexService;
 import java.nio.file.Files;
@@ -16,18 +17,7 @@ class ReindexJobRunnerTest {
     @Test
     void shouldReturnNonZeroWhenValidationFails() throws Exception {
         var requestFile = tempDir.resolve("invalid-request.yaml");
-        Files.writeString(requestFile, """
-            source:
-              cluster:
-                baseUrl: http://source-solr:8983/solr
-              collection: source_collection
-            target:
-              cluster:
-                baseUrl: http://target-solr:8983/solr
-              collection: ' '
-            fields:
-              - id
-            """);
+        Files.writeString(requestFile, requestYamlWithBlankTargetCollection());
 
         var config = new ReindexJobConfig() {
             @Override

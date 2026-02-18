@@ -2,11 +2,8 @@ package com.solrex.reindex.solr;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.solrex.reindex.model.ClusterConfig;
-import com.solrex.reindex.model.CollectionRef;
 import com.solrex.reindex.model.ReindexFilters;
-import com.solrex.reindex.model.ReindexRequest;
-import com.solrex.reindex.model.ReindexTuning;
+import com.solrex.reindex.test.ReindexRequestFixtures;
 import java.util.List;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.common.params.CommonParams;
@@ -19,12 +16,9 @@ class SolrSourceDocumentReaderTest {
         try (var client = new Http2SolrClient.Builder("http://source-solr:8983/solr").build()) {
             var reader = new SolrSourceDocumentReader(client);
 
-            var request = new ReindexRequest(
-                new CollectionRef(new ClusterConfig("http://source-solr:8983/solr"), "source_collection"),
-                new CollectionRef(new ClusterConfig("http://target-solr:8983/solr"), "target_collection"),
+            var request = ReindexRequestFixtures.requestWithFiltersAndFields(
                 new ReindexFilters("*:*", List.of("type:book")),
-                List.of("title"),
-                ReindexTuning.defaults()
+                List.of("title")
             );
 
             var params = reader.baseReadParams(request, "id");

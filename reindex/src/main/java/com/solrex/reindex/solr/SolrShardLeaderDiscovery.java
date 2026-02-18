@@ -6,6 +6,7 @@ import com.solrex.reindex.util.ReindexErrorClassifier;
 import io.smallrye.mutiny.Uni;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.NonNull;
@@ -31,13 +32,17 @@ public final class SolrShardLeaderDiscovery {
     }
 
     static List<ShardLeaderReplica> extractShardLeaders(NamedList<Object> response, String collection) {
-        var collections = requiredObject(requiredObject(response, "cluster"), "collections");
-        var collectionStatus = requiredObject(collections, collection);
-        var shards = requiredObject(collectionStatus, "shards");
+        var cluster = requireObjectMap(response.get("cluster"), "cluster");
+        var collections = requireObjectMap(cluster.get("collections"), "cluster.collections");
+        var collectionStatus = requireObjectMap(collections.get(collection), "cluster.collections." + collection);
+        var shards = requireObjectMap(
+            collectionStatus.get("shards"),
+            "cluster.collections." + collection + ".shards"
+        );
 
         var discoveredLeaders = new ArrayList<ShardLeaderReplica>();
-        for (var shard : entries(shards)) {
-            discoveredLeaders.add(leaderReplicaForShard(shard.key(), shard.value()));
+        for (var shard : shards.entrySet()) {
+            discoveredLeaders.add(leaderReplicaForShard(collection, shard.getKey(), shard.getValue()));
         }
 
         discoveredLeaders.sort(Comparator.comparing(ShardLeaderReplica::logicalShard));
@@ -59,19 +64,22 @@ public final class SolrShardLeaderDiscovery {
         return Uni.createFrom().completionStage(() -> sourceClient.requestAsync(request));
     }
 
-    private static ShardLeaderReplica leaderReplicaForShard(String shardName, Object shardData) {
-        var replicas = requiredObject(shardData, "replicas");
+    private static ShardLeaderReplica leaderReplicaForShard(String collection, String shardName, Object shardData) {
+        var shardPath = "cluster.collections." + collection + ".shards." + shardName;
+        var shard = requireObjectMap(shardData, shardPath);
+        var replicas = requireObjectMap(shard.get("replicas"), shardPath + ".replicas");
 
-        for (var replica : entries(replicas)) {
-            if (!isActiveReplica(replica.value()) || !isLeaderReplica(replica.value())) {
+        for (var replica : replicas.values()) {
+            var replicaData = requireObjectMap(replica, shardPath + ".replicas.<replica>");
+            if (!isActiveReplica(replicaData) || !isLeaderReplica(replicaData)) {
                 continue;
             }
 
-            var baseUrl = requiredString(replica.value(), "base_url");
+            var baseUrl = requiredString(replicaData, "base_url", shardPath);
             var coreName = firstNonBlank(
-                optionalString(replica.value(), "core"),
-                optionalString(replica.value(), "core_name"),
-                optionalString(replica.value(), "coreName")
+                optionalString(replicaData, "core"),
+                optionalString(replicaData, "core_name"),
+                optionalString(replicaData, "coreName")
             );
 
             if (coreName == null) {
@@ -86,13 +94,13 @@ public final class SolrShardLeaderDiscovery {
         throw new IllegalStateException("No ACTIVE leader replica found for shard '" + shardName + "'");
     }
 
-    private static boolean isActiveReplica(Object replicaData) {
+    private static boolean isActiveReplica(Map<String, Object> replicaData) {
         var state = optionalString(replicaData, "state");
         return state != null && "active".equalsIgnoreCase(state);
     }
 
-    private static boolean isLeaderReplica(Object replicaData) {
-        var value = valueOf(replicaData, "leader");
+    private static boolean isLeaderReplica(Map<String, Object> replicaData) {
+        var value = replicaData.get("leader");
         return switch (value) {
             case Boolean b -> b;
             case String s -> Boolean.parseBoolean(s);
@@ -100,16 +108,18 @@ public final class SolrShardLeaderDiscovery {
         };
     }
 
-    private static String requiredString(Object object, String key) {
+    private static String requiredString(Map<String, Object> object, String key, String path) {
         var value = optionalString(object, key);
         if (value == null) {
-            throw new IllegalStateException("Required value '" + key + "' was missing from cluster status response");
+            throw new IllegalStateException(
+                "Required value '" + path + "." + key + "' was missing from cluster status response"
+            );
         }
         return value;
     }
 
-    private static String optionalString(Object object, String key) {
-        var value = valueOf(object, key);
+    private static String optionalString(Map<String, Object> object, String key) {
+        var value = object.get(key);
         if (value == null) {
             return null;
         }
@@ -117,46 +127,36 @@ public final class SolrShardLeaderDiscovery {
         return text.isEmpty() ? null : text;
     }
 
-    private static Object requiredObject(Object object, String key) {
-        var value = valueOf(object, key);
+    private static Map<String, Object> requireObjectMap(Object value, String path) {
         if (value == null) {
-            throw new IllegalStateException("Required object '" + key + "' was missing from cluster status response");
+            throw new IllegalStateException("Required object '" + path + "' was missing from cluster status response");
         }
-        return value;
-    }
 
-    private static Object valueOf(Object object, String key) {
-        if (object instanceof NamedList<?> namedList) {
-            return namedList.get(key);
+        if (value instanceof Map<?, ?> map) {
+            var converted = new LinkedHashMap<String, Object>();
+            for (var entry : map.entrySet()) {
+                if (entry.getKey() == null) {
+                    continue;
+                }
+                converted.put(entry.getKey().toString(), entry.getValue());
+            }
+            return converted;
         }
-        if (object instanceof Map<?, ?> map) {
-            return map.get(key);
-        }
-        return null;
-    }
 
-    private static List<Entry> entries(Object object) {
-        var entries = new ArrayList<Entry>();
-
-        if (object instanceof NamedList<?> namedList) {
+        if (value instanceof NamedList<?> namedList) {
+            var converted = new LinkedHashMap<String, Object>();
             for (int i = 0; i < namedList.size(); i++) {
                 var key = namedList.getName(i);
                 if (key != null) {
-                    entries.add(new Entry(key, namedList.getVal(i)));
+                    converted.put(key, namedList.getVal(i));
                 }
             }
-            return entries;
+            return converted;
         }
 
-        if (object instanceof Map<?, ?> map) {
-            for (var entry : map.entrySet()) {
-                if (entry.getKey() != null) {
-                    entries.add(new Entry(entry.getKey().toString(), entry.getValue()));
-                }
-            }
-        }
-
-        return entries;
+        throw new IllegalStateException(
+            "Object '" + path + "' in cluster status response must be map-like but was " + value.getClass().getSimpleName()
+        );
     }
 
     private static String firstNonBlank(String... values) {
@@ -174,9 +174,6 @@ public final class SolrShardLeaderDiscovery {
             normalized = normalized.substring(0, normalized.length() - 1);
         }
         return normalized;
-    }
-
-    private record Entry(String key, Object value) {
     }
 
     public record ShardLeaderReplica(String logicalShard, String baseUrl, String coreName) {

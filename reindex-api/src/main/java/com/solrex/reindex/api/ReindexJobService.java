@@ -21,6 +21,19 @@ import java.util.Objects;
 
 @ApplicationScoped
 public class ReindexJobService {
+    private static final String LABEL_PART_OF = "app.kubernetes.io/part-of";
+    private static final String LABEL_NAME = "app.kubernetes.io/name";
+    private static final String LABEL_REINDEX_JOB = "solrex.io/reindex-job";
+    private static final String LABEL_PART_OF_VALUE = "solrex";
+    private static final String LABEL_NAME_VALUE = "reindex";
+    private static final String REINDEX_CONTAINER_NAME = "reindex";
+    private static final String REINDEX_REQUEST_VOLUME_NAME = "reindex-request";
+    private static final String ENV_QUARKUS_KUBERNETES_CONFIG_ENABLED = "QUARKUS_KUBERNETES_CONFIG_ENABLED";
+    private static final String ENV_QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG =
+        "QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG";
+    private static final String ENV_REINDEX_K8S_NAMESPACE = "REINDEX_K8S_NAMESPACE";
+    private static final String ENV_REINDEX_CONFIG_MAPS = "REINDEX_CONFIG_MAPS";
+    private static final String ENV_REINDEX_REQUEST_FILE = "REINDEX_REQUEST_FILE";
     static final String REQUEST_FILE_KEY = "request.yaml";
 
     private final ReindexApiConfig config;
@@ -121,9 +134,9 @@ public class ReindexJobService {
             .withNewMetadata()
             .withNamespace(namespace)
             .withName(configMapName)
-            .addToLabels("app.kubernetes.io/part-of", "solrex")
-            .addToLabels("app.kubernetes.io/name", "reindex")
-            .addToLabels("solrex.io/reindex-job", jobName)
+            .addToLabels(LABEL_PART_OF, LABEL_PART_OF_VALUE)
+            .addToLabels(LABEL_NAME, LABEL_NAME_VALUE)
+            .addToLabels(LABEL_REINDEX_JOB, jobName)
             .endMetadata()
             .addToData(REQUEST_FILE_KEY, requestYaml)
             .build();
@@ -136,34 +149,34 @@ public class ReindexJobService {
             .withNewMetadata()
             .withName(jobName)
             .withNamespace(namespace)
-            .addToLabels("app.kubernetes.io/part-of", "solrex")
-            .addToLabels("app.kubernetes.io/name", "reindex")
-            .addToLabels("solrex.io/reindex-job", jobName)
+            .addToLabels(LABEL_PART_OF, LABEL_PART_OF_VALUE)
+            .addToLabels(LABEL_NAME, LABEL_NAME_VALUE)
+            .addToLabels(LABEL_REINDEX_JOB, jobName)
             .endMetadata()
             .withNewSpec()
             .withBackoffLimit(config.job().backoffLimit())
             .withTtlSecondsAfterFinished(config.job().ttlSecondsAfterFinished())
             .withNewTemplate()
             .withNewMetadata()
-            .addToLabels("solrex.io/reindex-job", jobName)
+            .addToLabels(LABEL_REINDEX_JOB, jobName)
             .endMetadata()
             .withNewSpec()
             .withServiceAccountName(config.job().serviceAccount())
             .withRestartPolicy("Never")
             .addNewContainer()
-            .withName("reindex")
+            .withName(REINDEX_CONTAINER_NAME)
             .withImage(config.job().image())
             .withImagePullPolicy("IfNotPresent")
             .addNewEnv()
-            .withName("QUARKUS_KUBERNETES_CONFIG_ENABLED")
+            .withName(ENV_QUARKUS_KUBERNETES_CONFIG_ENABLED)
             .withValue(Boolean.toString(config.job().kubernetesConfigEnabled()))
             .endEnv()
             .addNewEnv()
-            .withName("QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG")
+            .withName(ENV_QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG)
             .withValue(Boolean.toString(config.job().kubernetesConfigFailOnMissingConfig()))
             .endEnv()
             .addNewEnv()
-            .withName("REINDEX_K8S_NAMESPACE")
+            .withName(ENV_REINDEX_K8S_NAMESPACE)
             .withNewValueFrom()
             .withNewFieldRef()
             .withApiVersion("v1")
@@ -172,21 +185,21 @@ public class ReindexJobService {
             .endValueFrom()
             .endEnv()
             .addNewEnv()
-            .withName("REINDEX_CONFIG_MAPS")
+            .withName(ENV_REINDEX_CONFIG_MAPS)
             .withValue(requestConfigMapName)
             .endEnv()
             .addNewEnv()
-            .withName("REINDEX_REQUEST_FILE")
+            .withName(ENV_REINDEX_REQUEST_FILE)
             .withValue(config.job().requestFile())
             .endEnv()
             .addNewVolumeMount()
-            .withName("reindex-request")
+            .withName(REINDEX_REQUEST_VOLUME_NAME)
             .withMountPath(requestPath.mountDirectory())
             .withReadOnly(true)
             .endVolumeMount()
             .endContainer()
             .addNewVolume()
-            .withName("reindex-request")
+            .withName(REINDEX_REQUEST_VOLUME_NAME)
             .withNewConfigMap()
             .withName(requestConfigMapName)
             .addNewItem()

@@ -37,29 +37,15 @@ reindex:
     source:
       cluster:
         baseUrl: http://solr-a:8983/solr
-        requestTimeout: PT30S
       collection: source_collection
     target:
       cluster:
         baseUrl: http://solr-b:8983/solr
-        requestTimeout: PT30S
       collection: target_collection
-    filters:
-      query: "*:*"
-      fqs: []
     fields:
       - id
       - title
       - category
-    tuning:
-      readPageSize: 500
-      writeBatchSize: 200
-      writeConcurrency: 4
-      retryPolicy:
-        maxRetries: 3
-        initialBackoff: PT0.25S
-        maxBackoff: PT5S
-        jitterFactor: 0.2
 
 job:
   backoffLimit: 1
