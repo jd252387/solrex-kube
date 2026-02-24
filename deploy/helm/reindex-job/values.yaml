@@ -19,7 +19,6 @@ rbac:
 configMap:
   create: true
   name: ""
-  requestKey: request.yaml
 
 kubernetesConfig:
   enabled: true
@@ -29,7 +28,6 @@ kubernetesConfig:
   configMaps: []
 
 reindex:
-  requestFile: /etc/reindex/request.yaml
   config:
     timeout: PT20M
   extraConfig: {}

@@ -27,9 +27,6 @@ public interface ReindexApiConfig {
         @WithDefault("3600")
         int ttlSecondsAfterFinished();
 
-        @WithDefault("/etc/reindex/request.yaml")
-        String requestFile();
-
         @WithDefault("true")
         boolean kubernetesConfigEnabled();
 

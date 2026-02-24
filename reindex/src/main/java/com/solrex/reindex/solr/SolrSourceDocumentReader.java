@@ -2,6 +2,7 @@ package com.solrex.reindex.solr;
 
 import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.RetryPolicy;
+import com.solrex.reindex.model.ReindexFilters;
 import com.solrex.reindex.util.ReindexErrorClassifier;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -27,79 +28,74 @@ public final class SolrSourceDocumentReader {
     private static final String DEFAULT_SORT_FIELD = "id";
 
     private final Http2SolrClient sourceClient;
-    private final SolrShardLeaderDiscovery shardLeaderDiscovery;
 
     public SolrSourceDocumentReader(@NonNull Http2SolrClient sourceClient) {
         this.sourceClient = sourceClient;
-        this.shardLeaderDiscovery = new SolrShardLeaderDiscovery(sourceClient);
     }
 
     public Uni<Multi<SolrInputDocument>> streamDocuments(@NonNull ReindexRequest request) {
-        return shardLeaderDiscovery
-            .discoverLeaders(request.source(), request.tuning().retryPolicy())
-            .onItem().transform(shardLeaders -> streamWithCursor(request, DEFAULT_SORT_FIELD, shardLeaders));
+        return SolrShardLeaderDiscovery
+                .discoverLeaders(sourceClient, request.source(), request.tuning().retryPolicy())
+                .onItem().transform(shardLeaders -> streamWithCursor(request, DEFAULT_SORT_FIELD, shardLeaders));
     }
 
     private Multi<SolrInputDocument> streamWithCursor(
-        ReindexRequest request,
-        String sortField,
-        List<SolrShardLeaderDiscovery.ShardLeaderReplica> shardLeaders
-    ) {
+            ReindexRequest request,
+            String sortField,
+            List<SolrShardLeaderDiscovery.ShardLeaderReplica> shardLeaders) {
         var shardStreams = shardLeaders.stream()
-            .sorted(Comparator.comparing(SolrShardLeaderDiscovery.ShardLeaderReplica::logicalShard))
-            .map(shard -> Multi.createFrom().emitter((MultiEmitter<? super SolrInputDocument> emitter) ->
-                fetchCursorPage(request, sortField, CursorMarkParams.CURSOR_MARK_START, shard, emitter)))
-            .toList();
+                .sorted(Comparator.comparing(SolrShardLeaderDiscovery.ShardLeaderReplica::logicalShard))
+                .map(shard -> Multi.createFrom()
+                        .emitter((MultiEmitter<? super SolrInputDocument> emitter) -> fetchCursorPage(request,
+                                sortField, CursorMarkParams.CURSOR_MARK_START, shard, emitter)))
+                .toList();
 
         if (shardStreams.isEmpty()) {
             return Multi.createFrom().empty();
         }
 
         return Multi.createBy().merging()
-            .withConcurrency(shardStreams.size())
-            .streams(shardStreams);
+                .withConcurrency(shardStreams.size())
+                .streams(shardStreams);
     }
 
     private void fetchCursorPage(
-        ReindexRequest request,
-        String sortField,
-        String cursorMark,
-        SolrShardLeaderDiscovery.ShardLeaderReplica shard,
-        MultiEmitter<? super SolrInputDocument> emitter
-    ) {
+            ReindexRequest request,
+            String sortField,
+            String cursorMark,
+            SolrShardLeaderDiscovery.ShardLeaderReplica shard,
+            MultiEmitter<? super SolrInputDocument> emitter) {
         if (emitter.isCancelled()) {
             return;
         }
 
         queryCursorPage(request, sortField, cursorMark, shard, request.tuning().retryPolicy())
-            .subscribe().with(
-                page -> {
-                    for (var doc : page.documents()) {
-                        if (emitter.isCancelled()) {
-                            return;
-                        }
-                        emitter.emit(doc);
-                    }
+                .subscribe().with(
+                        page -> {
+                            for (var doc : page.documents()) {
+                                if (emitter.isCancelled()) {
+                                    return;
+                                }
+                                emitter.emit(doc);
+                            }
 
-                    if (page.done() || emitter.isCancelled()) {
-                        emitter.complete();
-                        return;
-                    }
+                            if (page.done() || emitter.isCancelled()) {
+                                emitter.complete();
+                                return;
+                            }
 
-                    fetchCursorPage(request, sortField, page.nextCursorMark(), shard, emitter);
-                },
-                emitter::fail
-            );
+                            fetchCursorPage(request, sortField, page.nextCursorMark(), shard, emitter);
+                        },
+                        emitter::fail);
     }
 
     @SuppressWarnings("deprecation")
     private Uni<CursorPage> queryCursorPage(
-        ReindexRequest request,
-        String sortField,
-        String cursorMark,
-        SolrShardLeaderDiscovery.ShardLeaderReplica shard,
-        RetryPolicy retryPolicy
-    ) {
+            ReindexRequest request,
+            String sortField,
+            String cursorMark,
+            SolrShardLeaderDiscovery.ShardLeaderReplica shard,
+            RetryPolicy retryPolicy) {
         var params = baseReadParams(request, sortField);
         params.set(CursorMarkParams.CURSOR_MARK_PARAM, cursorMark);
         params.set(CommonParams.ROWS, request.tuning().readPageSize());
@@ -107,35 +103,35 @@ public final class SolrSourceDocumentReader {
         var queryRequest = new QueryRequest(params, SolrRequest.METHOD.GET);
 
         return requestAsync(queryRequest, shard.coreName())
-            .onItem().transform(response -> {
-                var queryResponse = new QueryResponse(sourceClient);
-                queryResponse.setResponse(response);
+                .onItem().transform(response -> {
+                    var queryResponse = new QueryResponse(sourceClient);
+                    queryResponse.setResponse(response);
 
-                var docs = new ArrayList<SolrInputDocument>();
-                var results = queryResponse.getResults();
-                if (results != null) {
-                    for (SolrDocument result : results) {
-                        docs.add(toInputDocument(result));
+                    var docs = new ArrayList<SolrInputDocument>();
+                    var results = queryResponse.getResults();
+                    if (results != null) {
+                        for (SolrDocument result : results) {
+                            docs.add(toInputDocument(result));
+                        }
                     }
-                }
 
-                var nextCursorMark = Objects.toString(response.get(CursorMarkParams.CURSOR_MARK_NEXT), cursorMark);
-                return new CursorPage(docs, nextCursorMark, cursorMark.equals(nextCursorMark));
-            })
-            .onFailure(ReindexErrorClassifier::isRetryable)
-            .retry()
-            .withBackOff(retryPolicy.initialBackoff(), retryPolicy.maxBackoff())
-            .atMost(retryPolicy.maxRetries());
+                    var nextCursorMark = Objects.toString(response.get(CursorMarkParams.CURSOR_MARK_NEXT), cursorMark);
+                    return new CursorPage(docs, nextCursorMark, cursorMark.equals(nextCursorMark));
+                })
+                .onFailure(ReindexErrorClassifier::isRetryable)
+                .retry()
+                .withBackOff(retryPolicy.initialBackoff(), retryPolicy.maxBackoff())
+                .atMost(retryPolicy.maxRetries());
     }
 
     ModifiableSolrParams baseReadParams(ReindexRequest request, String sortField) {
         var params = new ModifiableSolrParams();
-        params.set(CommonParams.Q, request.filters().query());
+        params.set(CommonParams.Q, ReindexFilters.DEFAULT_QUERY);
         params.set(CommonParams.FL, buildFieldList(request.fields(), sortField));
         params.set(CommonParams.SORT, sortField + " asc");
         params.set(CommonParams.DISTRIB, false);
 
-        for (String fq : request.filters().fqs()) {
+        for (String fq : request.filters()) {
             params.add(CommonParams.FQ, fq);
         }
 

@@ -4,18 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import jakarta.validation.Validator;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class DeploymentRequestExamplesTest {
     private final ObjectMapper yamlObjectMapper = new ObjectMapper(new YAMLFactory()).findAndRegisterModules();
-    private final ReindexRequestLoader requestLoader = new ReindexRequestLoader();
-
-    @TempDir
-    Path tempDir;
+    private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
     @SuppressWarnings("unchecked")
@@ -25,9 +24,9 @@ class DeploymentRequestExamplesTest {
             Map.class
         );
         var data = (Map<String, Object>) configMap.get("data");
-        var requestYaml = (String) data.get("request.yaml");
+        var requestYaml = (String) data.get("reindex.job.request");
 
-        var request = requestLoader.load(writeRequestFile("k8s-request.yaml", requestYaml));
+        var request = producer(requestYaml).reindexRequest();
 
         assertThat(request.source().collection()).isEqualTo("source_collection");
         assertThat(request.target().collection()).isEqualTo("target_collection");
@@ -45,17 +44,26 @@ class DeploymentRequestExamplesTest {
         var request = (Map<String, Object>) reindex.get("request");
         var requestYaml = yamlObjectMapper.writeValueAsString(request);
 
-        var loadedRequest = requestLoader.load(writeRequestFile("helm-request.yaml", requestYaml));
+        var loadedRequest = producer(requestYaml).reindexRequest();
 
         assertThat(loadedRequest.source().collection()).isEqualTo("source_collection");
         assertThat(loadedRequest.target().collection()).isEqualTo("target_collection");
         assertThat(loadedRequest.fields()).containsExactly("id", "title", "category");
     }
 
-    private Path writeRequestFile(String fileName, String requestYaml) throws Exception {
-        var requestFile = tempDir.resolve(fileName);
-        Files.writeString(requestFile, requestYaml);
-        return requestFile;
+    private ReindexRequestConfigProducer producer(String requestYaml) {
+        var config = new ReindexJobConfig() {
+            @Override
+            public String request() {
+                return requestYaml;
+            }
+
+            @Override
+            public Duration timeout() {
+                return Duration.ofMinutes(5);
+            }
+        };
+        return new ReindexRequestConfigProducer(config, validator);
     }
 
     private static Path repositoryRoot() {

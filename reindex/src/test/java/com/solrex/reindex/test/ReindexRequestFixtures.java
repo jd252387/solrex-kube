@@ -23,7 +23,7 @@ public final class ReindexRequestFixtures {
             SOURCE_COLLECTION,
             targetCluster(),
             TARGET_COLLECTION,
-            ReindexFilters.defaults(),
+            ReindexFilters.defaults().fqs(),
             List.of("id", "title"),
             ReindexTuning.defaults()
         );
@@ -35,7 +35,7 @@ public final class ReindexRequestFixtures {
             SOURCE_COLLECTION,
             targetCluster(),
             targetCollection,
-            ReindexFilters.defaults(),
+            ReindexFilters.defaults().fqs(),
             List.of("id"),
             ReindexTuning.defaults()
         );
@@ -47,7 +47,7 @@ public final class ReindexRequestFixtures {
             SOURCE_COLLECTION,
             targetCluster(),
             TARGET_COLLECTION,
-            ReindexFilters.defaults(),
+            ReindexFilters.defaults().fqs(),
             List.of("id"),
             tuning
         );
@@ -59,7 +59,7 @@ public final class ReindexRequestFixtures {
             SOURCE_COLLECTION,
             targetCluster(),
             TARGET_COLLECTION,
-            ReindexFilters.defaults(),
+            ReindexFilters.defaults().fqs(),
             List.of("id"),
             ReindexTuning.defaults()
         );
@@ -71,7 +71,7 @@ public final class ReindexRequestFixtures {
             SOURCE_COLLECTION,
             targetCluster(),
             TARGET_COLLECTION,
-            filters,
+            filters == null ? List.of() : filters.fqs(),
             fields,
             ReindexTuning.defaults()
         );
@@ -83,7 +83,7 @@ public final class ReindexRequestFixtures {
             SOURCE_COLLECTION,
             targetCluster(),
             TARGET_COLLECTION,
-            new ReindexFilters("*:*", List.of()),
+            List.of(),
             List.of("id", "title"),
             new ReindexTuning(200, 4, 4, retryPolicy)
         );
@@ -208,7 +208,7 @@ public final class ReindexRequestFixtures {
         String sourceCollection,
         ClusterConfig targetCluster,
         String targetCollection,
-        ReindexFilters filters,
+        List<String> filters,
         List<String> fields,
         ReindexTuning tuning
     ) {

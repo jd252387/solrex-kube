@@ -67,24 +67,11 @@ spec:
               {{- else }}
               value: {{ include "reindex-job.configMapName" . | quote }}
               {{- end }}
-            - name: REINDEX_REQUEST_FILE
-              value: {{ .Values.reindex.requestFile | quote }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          volumeMounts:
-            - name: reindex-request
-              mountPath: {{ dir .Values.reindex.requestFile | quote }}
-              readOnly: true
-      volumes:
-        - name: reindex-request
-          configMap:
-            name: {{ include "reindex-job.configMapName" . }}
-            items:
-              - key: {{ .Values.configMap.requestKey | quote }}
-                path: {{ base .Values.reindex.requestFile | quote }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

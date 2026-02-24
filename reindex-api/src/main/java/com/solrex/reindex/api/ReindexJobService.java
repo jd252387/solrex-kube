@@ -14,7 +14,6 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import jakarta.inject.Inject;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -27,14 +26,12 @@ public class ReindexJobService {
     private static final String LABEL_PART_OF_VALUE = "solrex";
     private static final String LABEL_NAME_VALUE = "reindex";
     private static final String REINDEX_CONTAINER_NAME = "reindex";
-    private static final String REINDEX_REQUEST_VOLUME_NAME = "reindex-request";
     private static final String ENV_QUARKUS_KUBERNETES_CONFIG_ENABLED = "QUARKUS_KUBERNETES_CONFIG_ENABLED";
     private static final String ENV_QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG =
         "QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG";
     private static final String ENV_REINDEX_K8S_NAMESPACE = "REINDEX_K8S_NAMESPACE";
     private static final String ENV_REINDEX_CONFIG_MAPS = "REINDEX_CONFIG_MAPS";
-    private static final String ENV_REINDEX_REQUEST_FILE = "REINDEX_REQUEST_FILE";
-    static final String REQUEST_FILE_KEY = "request.yaml";
+    static final String REQUEST_CONFIG_KEY = "reindex.job.request";
 
     private final ReindexApiConfig config;
     private final KubernetesClient kubernetesClient;
@@ -138,13 +135,11 @@ public class ReindexJobService {
             .addToLabels(LABEL_NAME, LABEL_NAME_VALUE)
             .addToLabels(LABEL_REINDEX_JOB, jobName)
             .endMetadata()
-            .addToData(REQUEST_FILE_KEY, requestYaml)
+            .addToData(REQUEST_CONFIG_KEY, requestYaml)
             .build();
     }
 
     private Job buildJob(String namespace, String jobName, String requestConfigMapName) {
-        var requestPath = RequestFilePath.from(config.job().requestFile());
-
         return new JobBuilder()
             .withNewMetadata()
             .withName(jobName)
@@ -188,26 +183,7 @@ public class ReindexJobService {
             .withName(ENV_REINDEX_CONFIG_MAPS)
             .withValue(requestConfigMapName)
             .endEnv()
-            .addNewEnv()
-            .withName(ENV_REINDEX_REQUEST_FILE)
-            .withValue(config.job().requestFile())
-            .endEnv()
-            .addNewVolumeMount()
-            .withName(REINDEX_REQUEST_VOLUME_NAME)
-            .withMountPath(requestPath.mountDirectory())
-            .withReadOnly(true)
-            .endVolumeMount()
             .endContainer()
-            .addNewVolume()
-            .withName(REINDEX_REQUEST_VOLUME_NAME)
-            .withNewConfigMap()
-            .withName(requestConfigMapName)
-            .addNewItem()
-            .withKey(REQUEST_FILE_KEY)
-            .withPath(requestPath.fileName())
-            .endItem()
-            .endConfigMap()
-            .endVolume()
             .endSpec()
             .endTemplate()
             .endSpec()
@@ -228,17 +204,5 @@ public class ReindexJobService {
         }
         var trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private record RequestFilePath(String mountDirectory, String fileName) {
-        private static RequestFilePath from(String configuredPath) {
-            var path = Path.of(configuredPath);
-            var fileName = path.getFileName() == null ? REQUEST_FILE_KEY : path.getFileName().toString();
-            var mountDirectory = path.getParent() == null ? "/etc/reindex" : path.getParent().toString();
-            if (mountDirectory.isBlank()) {
-                mountDirectory = "/etc/reindex";
-            }
-            return new RequestFilePath(mountDirectory, fileName);
-        }
     }
 }

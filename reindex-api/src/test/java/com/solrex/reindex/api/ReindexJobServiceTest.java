@@ -93,8 +93,7 @@ class ReindexJobServiceTest {
             "QUARKUS_KUBERNETES_CONFIG_ENABLED",
             "QUARKUS_KUBERNETES_CONFIG_FAIL_ON_MISSING_CONFIG",
             "REINDEX_K8S_NAMESPACE",
-            "REINDEX_CONFIG_MAPS",
-            "REINDEX_REQUEST_FILE"
+            "REINDEX_CONFIG_MAPS"
         );
     }
 
@@ -112,7 +111,6 @@ class ReindexJobServiceTest {
         when(jobConfig.serviceAccount()).thenReturn("reindex-job");
         when(jobConfig.backoffLimit()).thenReturn(1);
         when(jobConfig.ttlSecondsAfterFinished()).thenReturn(3600);
-        when(jobConfig.requestFile()).thenReturn("/etc/reindex/request.yaml");
         when(jobConfig.kubernetesConfigEnabled()).thenReturn(true);
         when(jobConfig.kubernetesConfigFailOnMissingConfig()).thenReturn(true);
 

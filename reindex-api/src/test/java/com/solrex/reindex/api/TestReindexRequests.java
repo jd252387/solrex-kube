@@ -2,7 +2,6 @@ package com.solrex.reindex.api;
 
 import com.solrex.reindex.model.ClusterConfig;
 import com.solrex.reindex.model.CollectionRef;
-import com.solrex.reindex.model.ReindexFilters;
 import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.ReindexTuning;
 import java.util.List;
@@ -18,7 +17,7 @@ final class TestReindexRequests {
         return new ReindexRequest(
             sourceCollection(),
             targetCollection(),
-            ReindexFilters.defaults(),
+            List.of(),
             List.of("id", "title", "category"),
             ReindexTuning.defaults()
         );

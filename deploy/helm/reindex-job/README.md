@@ -4,7 +4,7 @@ Deploys the Solrex one-shot reindex Kubernetes Job with:
 
 - `ServiceAccount`
 - `Role` / `RoleBinding` for ConfigMap reads
-- `ConfigMap` for reindex job properties and `request.yaml`
+- `ConfigMap` for reindex job properties and inline `reindex.job.request` YAML
 - `Job` that executes the reindex process
 
 ## Install

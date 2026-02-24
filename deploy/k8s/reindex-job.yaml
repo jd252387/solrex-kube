@@ -25,12 +25,6 @@ spec:
                   fieldPath: metadata.namespace
             - name: REINDEX_CONFIG_MAPS
               value: reindex-job-config
-            - name: REINDEX_REQUEST_FILE
-              value: /etc/reindex/request.yaml
-          volumeMounts:
-            - name: reindex-request
-              mountPath: /etc/reindex
-              readOnly: true
           resources:
             requests:
               cpu: "500m"
@@ -38,10 +32,3 @@ spec:
             limits:
               cpu: "2"
               memory: "2Gi"
-      volumes:
-        - name: reindex-request
-          configMap:
-            name: reindex-job-config
-            items:
-              - key: request.yaml
-                path: request.yaml

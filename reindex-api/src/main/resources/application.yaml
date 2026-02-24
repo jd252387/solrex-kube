@@ -19,6 +19,5 @@ reindex:
       service-account: ${REINDEX_JOB_SERVICE_ACCOUNT:reindex-job}
       backoff-limit: ${REINDEX_JOB_BACKOFF_LIMIT:1}
       ttl-seconds-after-finished: ${REINDEX_JOB_TTL_SECONDS_AFTER_FINISHED:3600}
-      request-file: ${REINDEX_JOB_REQUEST_FILE:/etc/reindex/request.yaml}
       kubernetes-config-enabled: true
       kubernetes-config-fail-on-missing-config: true

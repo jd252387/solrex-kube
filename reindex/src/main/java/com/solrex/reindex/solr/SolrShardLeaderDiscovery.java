@@ -10,25 +10,25 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 
-@RequiredArgsConstructor
 public final class SolrShardLeaderDiscovery {
-    @NonNull
-    private final Http2SolrClient sourceClient;
 
-    public Uni<List<ShardLeaderReplica>> discoverLeaders(CollectionRef source, RetryPolicy retryPolicy) {
-        return requestClusterStatus(source.collection())
-            .onItem().transform(response -> extractShardLeaders(response, source.collection()))
-            .onFailure(ReindexErrorClassifier::isRetryable)
-            .retry()
-            .withBackOff(retryPolicy.initialBackoff(), retryPolicy.maxBackoff())
-            .atMost(retryPolicy.maxRetries());
+    private SolrShardLeaderDiscovery() {
+    }
+
+    public static Uni<List<ShardLeaderReplica>> discoverLeaders(Http2SolrClient sourceClient, CollectionRef source,
+            RetryPolicy retryPolicy) {
+        return requestClusterStatus(sourceClient, source.collection())
+                .onItem().transform(response -> extractShardLeaders(response, source.collection()))
+                .onFailure(ReindexErrorClassifier::isRetryable)
+                .retry()
+                .withBackOff(retryPolicy.initialBackoff(), retryPolicy.maxBackoff())
+                .atMost(retryPolicy.maxRetries());
     }
 
     static List<ShardLeaderReplica> extractShardLeaders(NamedList<Object> response, String collection) {
@@ -36,9 +36,8 @@ public final class SolrShardLeaderDiscovery {
         var collections = requireObjectMap(cluster.get("collections"), "cluster.collections");
         var collectionStatus = requireObjectMap(collections.get(collection), "cluster.collections." + collection);
         var shards = requireObjectMap(
-            collectionStatus.get("shards"),
-            "cluster.collections." + collection + ".shards"
-        );
+                collectionStatus.get("shards"),
+                "cluster.collections." + collection + ".shards");
 
         var discoveredLeaders = new ArrayList<ShardLeaderReplica>();
         for (var shard : shards.entrySet()) {
@@ -47,19 +46,20 @@ public final class SolrShardLeaderDiscovery {
 
         discoveredLeaders.sort(Comparator.comparing(ShardLeaderReplica::logicalShard));
         if (discoveredLeaders.isEmpty()) {
-            throw new IllegalStateException("No active shard leaders were discovered for collection '" + collection + "'");
+            throw new IllegalStateException(
+                    "No active shard leaders were discovered for collection '" + collection + "'");
         }
 
         return List.copyOf(discoveredLeaders);
     }
 
-    private Uni<NamedList<Object>> requestClusterStatus(String collection) {
+    private static Uni<NamedList<Object>> requestClusterStatus(Http2SolrClient sourceClient, String collection) {
         var params = new ModifiableSolrParams();
         params.set("action", "CLUSTERSTATUS");
         params.set("collection", collection);
 
         var request = new GenericSolrRequest(SolrRequest.METHOD.GET, "/admin/collections", params)
-            .setRequiresCollection(false);
+                .setRequiresCollection(false);
 
         return Uni.createFrom().completionStage(() -> sourceClient.requestAsync(request));
     }
@@ -77,15 +77,13 @@ public final class SolrShardLeaderDiscovery {
 
             var baseUrl = requiredString(replicaData, "base_url", shardPath);
             var coreName = firstNonBlank(
-                optionalString(replicaData, "core"),
-                optionalString(replicaData, "core_name"),
-                optionalString(replicaData, "coreName")
-            );
+                    optionalString(replicaData, "core"),
+                    optionalString(replicaData, "core_name"),
+                    optionalString(replicaData, "coreName"));
 
             if (coreName == null) {
                 throw new IllegalStateException(
-                    "Active leader replica for shard '" + shardName + "' is missing core name metadata"
-                );
+                        "Active leader replica for shard '" + shardName + "' is missing core name metadata");
             }
 
             return new ShardLeaderReplica(shardName, normalizeBaseUrl(baseUrl), coreName);
@@ -112,8 +110,7 @@ public final class SolrShardLeaderDiscovery {
         var value = optionalString(object, key);
         if (value == null) {
             throw new IllegalStateException(
-                "Required value '" + path + "." + key + "' was missing from cluster status response"
-            );
+                    "Required value '" + path + "." + key + "' was missing from cluster status response");
         }
         return value;
     }
@@ -155,8 +152,8 @@ public final class SolrShardLeaderDiscovery {
         }
 
         throw new IllegalStateException(
-            "Object '" + path + "' in cluster status response must be map-like but was " + value.getClass().getSimpleName()
-        );
+                "Object '" + path + "' in cluster status response must be map-like but was "
+                        + value.getClass().getSimpleName());
     }
 
     private static String firstNonBlank(String... values) {

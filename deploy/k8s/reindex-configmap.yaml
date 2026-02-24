@@ -5,7 +5,7 @@ metadata:
   namespace: solrex
 data:
   reindex.job.timeout: PT20M
-  request.yaml: |
+  reindex.job.request: |
     source:
       cluster:
         baseUrl: http://solr-a:8983/solr
