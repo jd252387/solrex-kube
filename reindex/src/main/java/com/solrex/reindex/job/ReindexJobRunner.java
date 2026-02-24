@@ -1,75 +1,51 @@
 package com.solrex.reindex.job;
 
-import com.solrex.reindex.api.DefaultReindexService;
-import com.solrex.reindex.model.ReindexResult;
+import com.solrex.reindex.model.ReindexRequest;
+import com.solrex.reindex.model.ReindexStats;
 import jakarta.inject.Singleton;
 import jakarta.validation.ConstraintViolationException;
-import java.time.Duration;
-import org.jboss.logging.Logger;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Singleton
+@RequiredArgsConstructor
+@Slf4j
 public final class ReindexJobRunner {
-    private static final Logger LOG = Logger.getLogger(ReindexJobRunner.class);
-
-    private final DefaultReindexService reindexService;
-    private final ReindexRequestLoader requestLoader;
+    private final ReindexService reindexService;
+    private final ReindexRequest request;
     private final ReindexJobConfig config;
-
-    public ReindexJobRunner(
-        DefaultReindexService reindexService,
-        ReindexRequestLoader requestLoader,
-        ReindexJobConfig config
-    ) {
-        this.reindexService = reindexService;
-        this.requestLoader = requestLoader;
-        this.config = config;
-    }
 
     public int run() {
         try {
-            var request = requestLoader.load(config.requestFile());
-            LOG.infof(
-                "Starting reindex. source=%s/%s target=%s/%s query=%s timeout=%s",
-                request.source().cluster().baseUrl(),
+            log.info(
+                "Starting reindex. source={}/{} target={}/{} filters={} timeout={}",
+                request.source().cluster().getBaseUrl(),
                 request.source().collection(),
-                request.target().cluster().baseUrl(),
+                request.target().cluster().getBaseUrl(),
                 request.target().collection(),
-                request.filters().query(),
+                request.filters(),
                 config.timeout()
             );
 
-            var result = reindexService.reindex(request)
-                .await().atMost(safeTimeout(config.timeout()));
+            ReindexStats stats = reindexService.reindex(request)
+                .await().atMost(config.timeout()).stats();
 
-            logResult(result);
-
+            log.info(
+                    "Reindex complete. docsRead={} docsIndexed={} batchesSent={} retries={} elapsed={}",
+                    stats.docsRead(),
+                    stats.docsIndexed(),
+                    stats.batchesSent(),
+                    stats.retries(),
+                    stats.elapsed()
+            );
             return 0;
         } catch (ConstraintViolationException e) {
-            LOG.errorf("Request validation failed: %s", e.getMessage());
+            log.error("Request validation failed", e);
             return 1;
         } catch (Exception e) {
-            LOG.error("Reindex job failed.", e);
+            log.error("Reindex job failed", e);
             return 1;
         }
-    }
-
-    private Duration safeTimeout(Duration timeout) {
-        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
-            return Duration.ofMinutes(15);
-        }
-        return timeout;
-    }
-
-    private void logResult(ReindexResult result) {
-        var stats = result.stats();
-
-        LOG.infof(
-            "Reindex complete. docsRead=%d docsIndexed=%d batchesSent=%d retries=%d elapsed=%s",
-            stats.docsRead(),
-            stats.docsIndexed(),
-            stats.batchesSent(),
-            stats.retries(),
-            stats.elapsed()
-        );
     }
 }

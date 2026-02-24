@@ -5,23 +5,16 @@ import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
 import io.quarkus.runtime.annotations.QuarkusMain;
 import jakarta.inject.Inject;
+import lombok.RequiredArgsConstructor;
 
 @QuarkusMain(name = "reindex-job")
-public final class ReindexJobMain {
-    private ReindexJobMain() {
-    }
+@RequiredArgsConstructor
+public final class ReindexJobMain implements QuarkusApplication {
+    @Inject
+    ReindexJobRunner reindexJobRunner;
 
-    public static void main(String... args) {
-        Quarkus.run(ReindexApplication.class, args);
-    }
-
-    public static class ReindexApplication implements QuarkusApplication {
-        @Inject
-        ReindexJobRunner reindexJobRunner;
-
-        @Override
-        public int run(String... args) {
-            return reindexJobRunner.run();
-        }
+    @Override
+    public int run(String... args) {
+        return reindexJobRunner.run();
     }
 }

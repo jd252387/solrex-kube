@@ -1,28 +1,31 @@
 package com.solrex.reindex.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlWithBlankTargetCollection;
+import static com.solrex.reindex.test.ReindexRequestFixtures.requestYamlUsingDefaults;
 
-import com.solrex.reindex.api.DefaultReindexService;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import com.solrex.reindex.solr.SolrClientFactory;
+import jakarta.validation.Validation;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class ReindexJobRunnerTest {
-    @TempDir
-    Path tempDir;
-
     @Test
-    void shouldReturnNonZeroWhenValidationFails() throws Exception {
-        var requestFile = tempDir.resolve("invalid-request.yaml");
-        Files.writeString(requestFile, requestYamlWithBlankTargetCollection());
+    void shouldReturnNonZeroWhenReindexFails() {
+        var config = config(requestYamlUsingDefaults());
+        var validator = Validation.buildDefaultValidatorFactory().getValidator();
+        var request = new ReindexRequestConfigProducer(config, validator).reindexRequest();
+        var service = new ReindexService(new SolrClientFactory(), validator);
 
-        var config = new ReindexJobConfig() {
+        var runner = new ReindexJobRunner(service, request, config);
+
+        assertThat(runner.run()).isEqualTo(1);
+    }
+
+    private ReindexJobConfig config(String requestYaml) {
+        return new ReindexJobConfig() {
             @Override
-            public Path requestFile() {
-                return requestFile;
+            public String request() {
+                return requestYaml;
             }
 
             @Override
@@ -30,13 +33,5 @@ class ReindexJobRunnerTest {
                 return Duration.ofSeconds(5);
             }
         };
-
-        var runner = new ReindexJobRunner(
-            new DefaultReindexService(),
-            new ReindexRequestLoader(),
-            config
-        );
-
-        assertThat(runner.run()).isEqualTo(1);
     }
 }

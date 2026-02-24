@@ -1,26 +1,37 @@
 package com.solrex.reindex.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 
-public record ClusterConfig(
-    @NotBlank String baseUrl,
-    @NotNull Duration requestTimeout,
-    String basicAuthUser,
-    String basicAuthPassword
-) {
+@Getter
+public class ClusterConfig {
     private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(30);
+    private final @NotBlank String baseUrl;
+    private final @NotNull Duration requestTimeout;
+    private final String basicAuthUser;
+    private final String basicAuthPassword;
 
     public ClusterConfig(String baseUrl) {
         this(baseUrl, DEFAULT_REQUEST_TIMEOUT, null, null);
     }
 
+    @JsonCreator
     public ClusterConfig(
+        @JsonProperty("baseUrl")
         String baseUrl,
+        @JsonProperty("requestTimeout")
         Duration requestTimeout,
+        @JsonProperty("basicAuthUser")
         String basicAuthUser,
+        @JsonProperty("basicAuthPassword")
         String basicAuthPassword
     ) {
         this.baseUrl = normalizeBaseUrl(baseUrl);
@@ -33,11 +44,27 @@ public record ClusterConfig(
         if (baseUrl == null) {
             return null;
         }
-        var value = baseUrl.trim();
-        while (value.endsWith("/")) {
-            value = value.substring(0, value.length() - 1);
+        try {
+            return new URI(baseUrl).normalize().toString();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid Solr baseUrl: " + baseUrl, e);
         }
-        return value;
+    }
+
+    public String baseUrl() {
+        return baseUrl;
+    }
+
+    public Duration requestTimeout() {
+        return requestTimeout;
+    }
+
+    public String basicAuthUser() {
+        return basicAuthUser;
+    }
+
+    public String basicAuthPassword() {
+        return basicAuthPassword;
     }
 
     @AssertTrue(message = "requestTimeout must be positive")

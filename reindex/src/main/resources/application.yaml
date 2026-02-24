@@ -11,5 +11,17 @@ quarkus:
 
 reindex:
   job:
-    request-file: ${REINDEX_REQUEST_FILE:/etc/reindex/request.yaml}
     timeout: ${REINDEX_JOB_TIMEOUT:PT15M}
+    request: |
+      source:
+        cluster:
+          baseUrl: http://solr-a:8983/solr
+        collection: source_collection
+      target:
+        cluster:
+          baseUrl: http://solr-b:8983/solr
+        collection: target_collection
+      fields:
+        - id
+        - title
+        - category

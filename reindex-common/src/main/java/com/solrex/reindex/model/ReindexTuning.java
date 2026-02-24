@@ -10,7 +10,7 @@ public record ReindexTuning(
     @Positive int writeConcurrency,
     @NotNull @Valid RetryPolicy retryPolicy
 ) {
-    private static final ReindexTuning DEFAULT = new ReindexTuning(
+    public static final ReindexTuning DEFAULT = new ReindexTuning(
         500,
         200,
         4,

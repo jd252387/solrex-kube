@@ -1,4 +1,4 @@
-package com.solrex.reindex.api;
+package com.solrex.reindex.job;
 
 import com.solrex.reindex.model.ReindexRequest;
 import com.solrex.reindex.model.ReindexResult;
@@ -7,7 +7,6 @@ import com.solrex.reindex.solr.SolrClientFactory;
 import com.solrex.reindex.solr.SolrSourceDocumentReader;
 import com.solrex.reindex.solr.SolrTargetDocumentWriter;
 import io.smallrye.mutiny.Uni;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -22,8 +21,8 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @Singleton
-@RequiredArgsConstructor(onConstructor_ = @Inject)
-public final class DefaultReindexService {
+@RequiredArgsConstructor()
+public final class ReindexService {
     private static final Executor CLOSE_EXECUTOR = command -> Thread.ofPlatform().daemon().start(command);
 
     @NonNull
@@ -31,16 +30,11 @@ public final class DefaultReindexService {
     @NonNull
     private final Validator validator;
 
-    public DefaultReindexService() {
+    public ReindexService() {
         this(new SolrClientFactory(), Validation.buildDefaultValidatorFactory().getValidator());
     }
 
-    public DefaultReindexService(SolrClientFactory solrClientFactory) {
-        this(solrClientFactory, Validation.buildDefaultValidatorFactory().getValidator());
-    }
-
-    public Uni<ReindexResult> reindex(ReindexRequest request) {
-        Objects.requireNonNull(request, "request must not be null");
+    public Uni<ReindexResult> reindex(@NonNull ReindexRequest request) {
         validate(request);
 
         var sourceClient = solrClientFactory.create(request.source().cluster());
